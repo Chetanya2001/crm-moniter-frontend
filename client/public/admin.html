@@ -21,9 +21,12 @@
     <h2>Admin: View Stream</h2>
     <div id="video-container"></div>
 
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script>
-      const socket = io("/", { query: { userId: "admin", role: "admin" } });
+      const socket = io(
+        "https://crm-monitor-backend-production.up.railway.app",
+        { query: { userId: "admin", role: "admin" } }
+      );
       const peers = {};
 
       socket.on("offer", async ({ offer, senderId }) => {
