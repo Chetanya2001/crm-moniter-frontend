@@ -41,15 +41,21 @@
             "Track kind:",
             event.track.kind
           );
-          const track = event.track;
-          const stream = new MediaStream([track]);
+
+          if (event.track.kind === "audio") {
+            const audio = new Audio();
+            audio.srcObject = new MediaStream([event.track]);
+            audio.autoplay = true;
+            document.body.appendChild(audio); // hidden playback
+            return;
+          }
 
           const video = document.createElement("video");
-          video.srcObject = stream;
+          video.srcObject = new MediaStream([event.track]);
           video.autoplay = true;
           video.controls = true;
           video.playsInline = true;
-          video.muted = true;
+          video.muted = true; // allow autoplay without interaction
 
           video.onloadedmetadata = () => {
             video
@@ -58,7 +64,7 @@
           };
 
           const label = document.createElement("p");
-          label.textContent = `${track.kind.toUpperCase()} (${senderId.slice(
+          label.textContent = `${event.track.kind.toUpperCase()} (${senderId.slice(
             0,
             5
           )}...)`;
