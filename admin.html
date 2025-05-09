@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Admin: View Executive Streams</title>
+    <style>
+      #video-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+        gap: 20px;
+        padding: 20px;
+      }
+      video {
+        width: 100%;
+        border: 2px solid #ccc;
+        background: black;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Admin: View Stream</h2>
+    <div id="video-container"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io("/", { query: { userId: "admin", role: "admin" } });
+      const peers = {};
+
+      socket.on("offer", async ({ offer, senderId }) => {
+        console.log("Received offer from:", senderId);
+        const peer = new RTCPeerConnection();
+        peers[senderId] = peer;
+
+        peer.ontrack = (event) => {
+          console.log(
+            "ontrack fired for:",
+            senderId,
+            "Track kind:",
+            event.track.kind
+          );
+          const track = event.track;
+          const stream = new MediaStream([track]);
+
+          const video = document.createElement("video");
+          video.srcObject = stream;
+          video.autoplay = true;
+          video.controls = true;
+          video.playsInline = true;
+          video.muted = true;
+
+          video.onloadedmetadata = () => {
+            video
+              .play()
+              .catch((err) => console.error("Video playback error:", err));
+          };
+
+          const label = document.createElement("p");
+          label.textContent = `${track.kind.toUpperCase()} (${senderId.slice(
+            0,
+            5
+          )}...)`;
+
+          const container = document.createElement("div");
+          container.appendChild(label);
+          container.appendChild(video);
+
+          document.getElementById("video-container").appendChild(container);
+        };
+
+        peer.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.emit("ice-candidate", {
+              targetId: senderId,
+              candidate: event.candidate,
+            });
+          }
+        };
+
+        await peer.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        socket.emit("answer", {
+          targetId: senderId,
+          answer: peer.localDescription,
+        });
+      });
+
+      socket.on("ice-candidate", ({ senderId, candidate }) => {
+        const peer = peers[senderId];
+        if (peer && candidate) {
+          peer.addIceCandidate(new RTCIceCandidate(candidate));
+          console.log("ICE candidate added for:", senderId);
+        }
+      });
+    </script>
+  </body>
+</html>

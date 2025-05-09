@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Executive</title>
+  </head>
+  <body>
+    <h2>Executive: Sharing Screen + Camera + Mic</h2>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io("/", { query: { userId: "exec1", role: "executive" } });
+      let peer;
+
+      async function start() {
+        try {
+          const screen = await navigator.mediaDevices.getDisplayMedia({
+            video: true,
+          });
+          const camMic = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true,
+          });
+
+          const combinedStream = new MediaStream([
+            ...screen.getVideoTracks(),
+            ...camMic.getVideoTracks(),
+            ...camMic.getAudioTracks(),
+          ]);
+
+          peer = new RTCPeerConnection();
+          combinedStream
+            .getTracks()
+            .forEach((track) => peer.addTrack(track, combinedStream));
+
+          peer.onicecandidate = (event) => {
+            if (event.candidate) {
+              socket.emit("ice-candidate", {
+                targetId: "admin",
+                candidate: event.candidate,
+              });
+            }
+          };
+
+          const offer = await peer.createOffer();
+          await peer.setLocalDescription(offer);
+          socket.emit("offer", { targetId: "admin", offer });
+
+          socket.on("answer", async ({ answer }) => {
+            await peer.setRemoteDescription(new RTCSessionDescription(answer));
+          });
+
+          socket.on("ice-candidate", ({ candidate }) => {
+            peer.addIceCandidate(new RTCIceCandidate(candidate));
+          });
+        } catch (err) {
+          console.error("Streaming error:", err);
+        }
+      }
+
+      start();
+    </script>
+  </body>
+</html>
